@@ -27,6 +27,10 @@ public class NodeId implements Serializable {
         return value.equals(nodeId.value);
     }
 
+    public String getValue() {
+        return value;
+    }
+
     @Override
     public int hashCode() {
         return Objects.hash(value);
@@ -36,4 +40,5 @@ public class NodeId implements Serializable {
     public String toString() {
         return this.value;
     }
+
 }

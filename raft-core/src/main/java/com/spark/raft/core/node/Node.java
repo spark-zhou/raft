@@ -1,6 +1,10 @@
 package com.spark.raft.core.node;
 
-public class Node {
+public interface Node {
 
+    //启动
+    void start();
 
+    //关闭
+    void stop() throws InterruptedException;
 }

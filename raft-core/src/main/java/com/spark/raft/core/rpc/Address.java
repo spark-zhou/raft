@@ -3,7 +3,9 @@ package com.spark.raft.core.rpc;
 import com.google.common.base.Preconditions;
 
 import javax.annotation.Nonnull;
+import javax.annotation.concurrent.Immutable;
 
+@Immutable
 public class Address {
 
     private final String host;
