@@ -101,7 +101,6 @@ public class NodeImpl implements Node {
             case CANDIDATE:
                 becomeFollower(rpc.getTerm(), null, rpc.getLeaderId(),true);
                 return new AppendEntriesResult(rpc.getTerm(), appendEntries(rpc));
-
             case LEADER:
                 logger.warn("receive append entries rpc from another leader {}, ignore..",rpc.getLeaderId());
                 return new AppendEntriesResult(rpc.getTerm(), false);
