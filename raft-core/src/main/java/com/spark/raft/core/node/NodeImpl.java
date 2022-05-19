@@ -1,15 +1,11 @@
 package com.spark.raft.core.node;
 
 import com.google.common.eventbus.Subscribe;
-import com.spark.raft.core.node.role.AbstractNodeRole;
-import com.spark.raft.core.node.role.CandidateNodeRole;
-import com.spark.raft.core.node.role.FollowerNodeRole;
-import com.spark.raft.core.node.role.RoleName;
+import com.spark.raft.core.node.role.*;
 import com.spark.raft.core.node.store.NodeStore;
-import com.spark.raft.core.rpc.message.RequestVoteResult;
-import com.spark.raft.core.rpc.message.RequestVoteRpc;
-import com.spark.raft.core.rpc.message.RequestVoteRpcMessage;
+import com.spark.raft.core.rpc.message.*;
 import com.spark.raft.core.schedule.ElectionTimeout;
+import com.spark.raft.core.schedule.LogReplicationTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +52,70 @@ public class NodeImpl implements Node {
         context.getTaskExecutor().submit(() -> doProcessRequestVoteResult(result));
     }
 
+    @Subscribe
+    public void onRecieveAppendEntriesRpc(AppendEntriesRpcMessage message) {
+
+        context.getTaskExecutor().submit(() -> context.getConnector().replyAppendEnrties(
+                doProcessAppendEntriesRpc(message),
+                context.getGroup().findMember(message.getSourceNodeId()).getEndpoint()
+        ));
+    }
+
+    @Subscribe
+    public void onReceiveAppendEntriesResult(AppendEntriesResultMessage resultMessage) {
+
+        context.getTaskExecutor().submit(() -> doProcessAppendEntriesResult(resultMessage));
+    }
+
+    private void doProcessAppendEntriesResult(AppendEntriesResultMessage resultMessage) {
+        AppendEntriesResult result = resultMessage.get();
+
+        if (result.getTerm() > role.getTerm()) {
+            becomeFollower(result.getTerm(),null,null,true);
+            return;
+        }
+
+        if (role.getName() != RoleName.LEADER) {
+            logger.warn("received append entries result from node {} but current node is not leader, ignore.",resultMessage.getSourceNodeId());
+        }
+    }
+
+    private AppendEntriesResult doProcessAppendEntriesRpc(AppendEntriesRpcMessage message) {
+
+        AppendEntriesRpc rpc = message.get();
+
+        if (rpc.getTerm() < role.getTerm()) {
+            return new AppendEntriesResult(role.getTerm(),false);
+        }
+
+        if (rpc.getTerm() > role.getTerm()) {
+            becomeFollower(rpc.getTerm(), null, rpc.getLeaderId(),true);
+            return new AppendEntriesResult(rpc.getTerm(), appendEntries(rpc));
+        }
+
+        assert rpc.getTerm() == role.getTerm();
+        switch (role.getName()) {
+            case FOLLOWER:
+                becomeFollower(rpc.getTerm(),((FollowerNodeRole)role).getVotedFor(),rpc.getLeaderId(),true);
+                return new AppendEntriesResult(rpc.getTerm(), appendEntries(rpc));
+            case CANDIDATE:
+                becomeFollower(rpc.getTerm(), null, rpc.getLeaderId(),true);
+                return new AppendEntriesResult(rpc.getTerm(), appendEntries(rpc));
+
+            case LEADER:
+                logger.warn("receive append entries rpc from another leader {}, ignore..",rpc.getLeaderId());
+                return new AppendEntriesResult(rpc.getTerm(), false);
+            default:
+                throw new IllegalStateException("unexpected node role [" + role.getName().name() +"]");
+        }
+    }
+
+    private boolean appendEntries(AppendEntriesRpc rpc) {
+
+        return true;
+    }
+
+
     private RequestVoteResult doProcessRequestVoteRpc(RequestVoteRpcMessage message) {
 
         if (!context.getGroup().isMemberOfMajor(message.getSourceNodeId())) {
@@ -98,6 +158,62 @@ public class NodeImpl implements Node {
 
     private void doProcessRequestVoteResult(RequestVoteResult result) {
 
+        if (result.getTerm() > role.getTerm()) {
+            becomeFollower(result.getTerm(), null,null,true);
+            return;
+        }
+
+        if (role.getName() != RoleName.CANDIDATE) {
+            logger.info("receive request vote result and current role is not candidate, ignore...");
+            return;
+        }
+
+        if (result.getTerm() < role.getTerm() || !result.isVoteGranted()) {
+            return;
+        }
+
+        int currentVotesCount = ((CandidateNodeRole) role).getVotesCount() + 1;
+
+        int countOfMajor = context.getGroup().getCountOfMajor();
+        logger.info("votes count {}, node count {}",currentVotesCount,countOfMajor);
+
+        role.cancelTimeoutOrTask();
+
+        if (currentVotesCount > countOfMajor / 2) {
+            logger.info("become leader, term = {}",role.getTerm());
+            changeToRole(new LeaderNodeRole(role.getTerm(),scheduleLogReplicationTask()));
+        } else {
+            changeToRole(new CandidateNodeRole(role.getTerm(),currentVotesCount,scheduleElectionTimeout()));
+        }
+
+    }
+
+    private LogReplicationTask scheduleLogReplicationTask() {
+        return context.getScheduler().scheduleLogReplicationTask(this::replicateLog);
+    }
+
+    public void replicateLog() {
+        context.getTaskExecutor().submit(this::doReplicateLog);
+    }
+
+    void doReplicateLog() {
+
+        logger.info("replicate log");
+
+        for (GroupMember member : context.getGroup().listReplicationTarget()) {
+            sendReplicateLog(member);
+        }
+    }
+
+    private void sendReplicateLog(GroupMember member) {
+
+        AppendEntriesRpc rpc = new AppendEntriesRpc();
+        rpc.setTerm(role.getTerm());
+        rpc.setLeaderId(context.getSelfId());
+        rpc.setPrevLogIndex(0);
+        rpc.setPrevLogTerm(0);
+        rpc.setLeaderCommit(0);
+        context.getConnector().sendAppendEnrties(rpc,member.getEndpoint());
     }
 
     private void becomeFollower(int term,NodeId votedFor, NodeId leaderId,boolean scheduleElectionTimeout) {
@@ -165,5 +281,13 @@ public class NodeImpl implements Node {
         rpc.setLastLogIndex(0);
         rpc.setLastLogTerm(0);
         context.getConnector().sendRequestVote(rpc,context.getGroup().listEndpointOfMajorExceptSelf());
+    }
+
+    NodeContext getContext() {
+        return this.context;
+    }
+
+    AbstractNodeRole getRole() {
+        return this.role;
     }
 }

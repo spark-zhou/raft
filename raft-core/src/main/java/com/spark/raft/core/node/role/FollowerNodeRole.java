@@ -28,6 +28,21 @@ public class FollowerNodeRole extends AbstractNodeRole {
     }
 
     @Override
+    public NodeId getLeaderId(NodeId selfId) {
+        return null;
+    }
+
+    @Override
+    public RoleState getState() {
+        return null;
+    }
+
+    @Override
+    protected boolean doStateEquals(AbstractNodeRole role) {
+        return false;
+    }
+
+    @Override
     public void cancelTimeoutOrTask() {
         this.electionTimeout.cancel();
     }
