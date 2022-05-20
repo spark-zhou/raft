@@ -4,7 +4,6 @@ import com.spark.raft.core.support.RandomAccessFileAdapter;
 import com.spark.raft.core.support.SeekableFile;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
