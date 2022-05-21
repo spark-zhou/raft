@@ -285,7 +285,7 @@ public class NodeGroup {
 
         @Override
         public int compareTo(@Nonnull NodeMatchIndex o) {
-            return -Integer.compare(o.matchIndex, this.matchIndex);
+            return Integer.compare(this.matchIndex, o.matchIndex);
         }
 
         @Override

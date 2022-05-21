@@ -1,6 +1,8 @@
 package com.spark.raft.core.node;
 
 import com.google.common.eventbus.EventBus;
+import com.spark.raft.core.log.Log;
+import com.spark.raft.core.log.MemoryLog;
 import com.spark.raft.core.node.config.NodeConfig;
 import com.spark.raft.core.node.store.MemoryNodeStore;
 import com.spark.raft.core.rpc.Connector;
@@ -25,6 +27,8 @@ public class NodeBuilder {
     private Connector connector = null;
 
     private TaskExecutor taskExecutor = null;
+
+    private Log log = null;
 
     public NodeBuilder(NodeEndpoint endpoint) {
         this(Collections.singletonList(endpoint),endpoint.getId());
@@ -68,6 +72,7 @@ public class NodeBuilder {
         context.setConnector(connector);
         context.setTaskExecutor(taskExecutor != null ? taskExecutor : new SingleThreadTaskExecutor("node"));
         context.setStore(new MemoryNodeStore());
+        context.setLog(log != null ? log : new MemoryLog());
         return context;
     }
 }

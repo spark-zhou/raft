@@ -35,6 +35,8 @@ public class AppendEntriesRpc {
      */
     private int leaderCommit;
 
+    private int lastEntryIndex;
+
     public int getTerm() {
         return term;
     }
@@ -81,6 +83,14 @@ public class AppendEntriesRpc {
 
     public void setLeaderCommit(int leaderCommit) {
         this.leaderCommit = leaderCommit;
+    }
+
+    public int getLastEntryIndex() {
+        return lastEntryIndex;
+    }
+
+    public void setLastEntryIndex(int lastEntryIndex) {
+        this.lastEntryIndex = lastEntryIndex;
     }
 
     @Override

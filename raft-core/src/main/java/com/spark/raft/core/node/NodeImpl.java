@@ -1,6 +1,7 @@
 package com.spark.raft.core.node;
 
 import com.google.common.eventbus.Subscribe;
+import com.spark.raft.core.log.entry.EntryMeta;
 import com.spark.raft.core.node.role.*;
 import com.spark.raft.core.node.store.NodeStore;
 import com.spark.raft.core.rpc.message.*;
@@ -77,6 +78,26 @@ public class NodeImpl implements Node {
 
         if (role.getName() != RoleName.LEADER) {
             logger.warn("received append entries result from node {} but current node is not leader, ignore.",resultMessage.getSourceNodeId());
+            return;
+        }
+
+        NodeId sourceNodeId = resultMessage.getSourceNodeId();
+        GroupMember member = context.getGroup().getMember(sourceNodeId);
+
+        if (member == null) {
+            logger.warn("unexpected append entries result from node {}, node maybe removed.",sourceNodeId);
+            return;
+        }
+
+        AppendEntriesRpc rpc = resultMessage.getRpc();
+        if (result.isSuccess()) {
+            if (member.advanceReplicatingState(rpc.getLastEntryIndex())) {
+                context.getLog().advanceCommitIndex(context.getGroup().getMatchIndexOfMajor(),role.getTerm());
+            }
+        } else {
+            if (!member.backOffNextIndex()) {
+                logger.warn("cannot back off next index more,node {}",sourceNodeId);
+            }
         }
     }
 
@@ -111,7 +132,12 @@ public class NodeImpl implements Node {
 
     private boolean appendEntries(AppendEntriesRpc rpc) {
 
-        return true;
+        boolean result = context.getLog().appendEntriesFromLeader(rpc.getPrevLogIndex(),rpc.getPrevLogTerm(),rpc.getEntries());
+
+        if (result) {
+            context.getLog().advanceCommitIndex(Math.min(rpc.getLeaderCommit(),context.getLog().getLastEntryMeta().getIndex()),rpc.getTerm());
+        }
+        return result;
     }
 
 
@@ -132,7 +158,7 @@ public class NodeImpl implements Node {
         // step down if result's term is larger than current term
         boolean voteForCandidate = true;
         if (rpc.getTerm() > role.getTerm()) {
-//            boolean voteForCandidate = !context.log().isNewerThan(rpc.getLastLogIndex(), rpc.getLastLogTerm());
+            voteForCandidate = !context.getLog().isNewerThan(rpc.getLastLogIndex(), rpc.getLastLogTerm());
             becomeFollower(rpc.getTerm(), (voteForCandidate ? rpc.getCandidateId() : null), null, true);
             return new RequestVoteResult(rpc.getTerm(), voteForCandidate);
         }
@@ -200,18 +226,19 @@ public class NodeImpl implements Node {
         logger.info("replicate log");
 
         for (GroupMember member : context.getGroup().listReplicationTarget()) {
-            sendReplicateLog(member);
+            sendReplicateLog(member,-1);
         }
     }
 
-    private void sendReplicateLog(GroupMember member) {
+    private void sendReplicateLog(GroupMember member, int maxEntries) {
 
-        AppendEntriesRpc rpc = new AppendEntriesRpc();
-        rpc.setTerm(role.getTerm());
-        rpc.setLeaderId(context.getSelfId());
-        rpc.setPrevLogIndex(0);
-        rpc.setPrevLogTerm(0);
-        rpc.setLeaderCommit(0);
+//        AppendEntriesRpc rpc = new AppendEntriesRpc();
+//        rpc.setTerm(role.getTerm());
+//        rpc.setLeaderId(context.getSelfId());
+//        rpc.setPrevLogIndex(0);
+//        rpc.setPrevLogTerm(0);
+//        rpc.setLeaderCommit(0);
+        AppendEntriesRpc rpc = context.getLog().createAppendEntriesRpc(role.getTerm(),context.getSelfId(),member.getNextIndex(),maxEntries);
         context.getConnector().sendAppendEnrties(rpc,member.getEndpoint());
     }
 
@@ -274,11 +301,13 @@ public class NodeImpl implements Node {
 
         changeToRole(new CandidateNodeRole(newTerm,scheduleElectionTimeout()));
 
+        EntryMeta meta = context.getLog().getLastEntryMeta();
+
         RequestVoteRpc rpc = new RequestVoteRpc();
         rpc.setTerm(newTerm);
         rpc.setCandidateId(context.getSelfId());
-        rpc.setLastLogIndex(0);
-        rpc.setLastLogTerm(0);
+        rpc.setLastLogIndex(meta.getIndex());
+        rpc.setLastLogTerm(meta.getTerm());
         context.getConnector().sendRequestVote(rpc,context.getGroup().listEndpointOfMajorExceptSelf());
     }
 

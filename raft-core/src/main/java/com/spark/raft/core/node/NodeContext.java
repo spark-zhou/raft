@@ -1,6 +1,7 @@
 package com.spark.raft.core.node;
 
 import com.google.common.eventbus.EventBus;
+import com.spark.raft.core.log.Log;
 import com.spark.raft.core.node.store.NodeStore;
 import com.spark.raft.core.rpc.Connector;
 import com.spark.raft.core.schedule.Scheduler;
@@ -12,7 +13,7 @@ public class NodeContext {
 
     private NodeGroup group;
 
-//    private Log log;
+    private Log log;
 
     private Connector connector;
 
@@ -78,5 +79,13 @@ public class NodeContext {
 
     public void setStore(NodeStore store) {
         this.store = store;
+    }
+
+    public Log getLog() {
+        return log;
+    }
+
+    public void setLog(Log log) {
+        this.log = log;
     }
 }
