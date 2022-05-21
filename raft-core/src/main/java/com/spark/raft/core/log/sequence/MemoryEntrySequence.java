@@ -27,7 +27,7 @@ public class MemoryEntrySequence extends AbstractEntrySequence {
 
     @Override
     protected List<Entry> doSubList(int fromIndex, int toIndex) {
-        return entries.subList(fromIndex - logIndexOffset, toIndex);
+        return entries.subList(fromIndex - logIndexOffset, toIndex - logIndexOffset);
     }
 
     @Override
