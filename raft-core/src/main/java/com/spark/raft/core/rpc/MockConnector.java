@@ -55,6 +55,11 @@ public class MockConnector implements Connector {
         messages.add(message);
     }
 
+    @Override
+    public void resetChannels() {
+
+    }
+
     public Message getLastMessage() {
         return messages.isEmpty() ? null : messages.getLast();
     }

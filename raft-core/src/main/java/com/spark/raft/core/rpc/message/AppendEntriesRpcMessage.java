@@ -1,7 +1,7 @@
 package com.spark.raft.core.rpc.message;
 
 import com.spark.raft.core.node.NodeId;
-import io.netty.channel.Channel;
+import com.spark.raft.core.rpc.Channel;
 
 public class AppendEntriesRpcMessage extends AbstractRpcMessage<AppendEntriesRpc> {
 

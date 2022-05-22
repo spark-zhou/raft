@@ -29,7 +29,7 @@ public class FollowerNodeRole extends AbstractNodeRole {
 
     @Override
     public NodeId getLeaderId(NodeId selfId) {
-        return null;
+        return leaderId;
     }
 
     @Override

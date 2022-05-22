@@ -20,6 +20,9 @@ public interface Connector {
 
     void replyAppendEnrties(AppendEntriesResult result, NodeEndpoint destinationEndPoint);
 
+
+
+    void resetChannels();
     void close();
 
 }

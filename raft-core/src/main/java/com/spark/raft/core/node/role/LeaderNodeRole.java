@@ -18,7 +18,7 @@ public class LeaderNodeRole extends AbstractNodeRole {
 
     @Override
     public NodeId getLeaderId(NodeId selfId) {
-        return null;
+        return selfId;
     }
 
     @Override
