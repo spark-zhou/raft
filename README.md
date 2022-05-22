@@ -36,7 +36,13 @@ Leader 与 Follower 之间的日志复制是共识算法运用于复制状态机
 
 ## 2，实现Raft算法
 
-### 2.1 组件图
-
+### 2.1 实现功能
+主要实现单leader的raft集群算法，multi-group模式后续再实现
+ （1）leader选举
+	（2）日志复制
+	（3）日志快照
+	（4）集群成员管理
+	
+### 2.2 组件图
 
 ![image](https://user-images.githubusercontent.com/105574077/169656408-1ef0b3c0-5e50-4668-85aa-f159560621f1.png)
